@@ -1,0 +1,147 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+  STAFF
+}
+
+enum OrderStatus {
+  PENDING
+  IN_PROGRESS
+  READY
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id             String          @id @default(uuid())
+  email          String          @unique
+  passwordHash   String
+  firstName      String
+  lastName       String
+  phone          String?
+  role           UserRole        @default(CUSTOMER)
+  loyaltyPoints  Int             @default(0)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  addresses      Address[]
+  paymentMethods PaymentMethod[]
+  carts          Cart[]
+  orders         Order[]
+}
+
+model Address {
+  id        String   @id @default(uuid())
+  label     String?
+  line1     String
+  line2     String?
+  city      String
+  state     String
+  postal    String
+  country   String
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PaymentMethod {
+  id        String   @id @default(uuid())
+  brand     String
+  last4     String
+  expMonth  Int
+  expYear   Int
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  createdAt DateTime @default(now())
+}
+
+model MenuCategory {
+  id        String     @id @default(uuid())
+  slug      String     @unique
+  name      String
+  icon      String?
+  createdAt DateTime   @default(now())
+  items     MenuItem[]
+}
+
+model MenuItem {
+  id            String        @id @default(uuid())
+  name          String
+  description   String
+  price         Decimal       @db.Decimal(10, 2)
+  imageUrl      String?
+  dietary       String[]
+  allergens     String[]
+  spiceLevel    Int           @default(0)
+  prepTime      Int           @default(15)
+  isAvailable   Boolean       @default(true)
+  isPopular     Boolean       @default(false)
+  rating        Float         @default(4.5)
+  reviewCount   Int           @default(0)
+  category      MenuCategory  @relation(fields: [categoryId], references: [id])
+  categoryId    String
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  cartItems     CartItem[]
+  orderItems    OrderItem[]
+}
+
+model Cart {
+  id         String      @id @default(uuid())
+  user       User        @relation(fields: [userId], references: [id])
+  userId     String
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  items      CartItem[]
+}
+
+model CartItem {
+  id        String   @id @default(uuid())
+  cart      Cart     @relation(fields: [cartId], references: [id])
+  cartId    String
+  item      MenuItem @relation(fields: [menuItemId], references: [id])
+  menuItemId String
+  quantity  Int      @default(1)
+  notes     String?
+}
+
+model Order {
+  id           String        @id @default(uuid())
+  user         User          @relation(fields: [userId], references: [id])
+  userId       String
+  status       OrderStatus   @default(PENDING)
+  total        Decimal       @db.Decimal(10, 2)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  items        OrderItem[]
+  deliveryEta  DateTime?
+  pickupReady  Boolean       @default(false)
+}
+
+model OrderItem {
+  id         String    @id @default(uuid())
+  order      Order     @relation(fields: [orderId], references: [id])
+  orderId    String
+  item       MenuItem  @relation(fields: [menuItemId], references: [id])
+  menuItemId String
+  price      Decimal   @db.Decimal(10, 2)
+  quantity   Int       @default(1)
+  notes      String?
+}
+
+model AnalyticsEvent {
+  id        String    @id @default(uuid())
+  type      String
+  data      Json
+  createdAt DateTime  @default(now())
+}
+

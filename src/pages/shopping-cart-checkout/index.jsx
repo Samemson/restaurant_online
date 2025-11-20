@@ -3,10 +3,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import CustomerNavigation from 'components/ui/CustomerNavigation';
 import Icon from 'components/AppIcon';
 import Image from 'components/AppImage';
+import api from 'api/http';
+import { useCart } from 'context/CartContext';
+import { useAuth } from 'context/AuthContext';
 
 function ShoppingCartCheckout() {
   const navigate = useNavigate();
-  const [cartItems, setCartItems] = useState([]);
   const [promoCode, setPromoCode] = useState('');
   const [promoMessage, setPromoMessage] = useState('');
   const [fulfillmentType, setFulfillmentType] = useState('delivery'); // 'delivery' or 'pickup'
@@ -14,44 +16,12 @@ function ShoppingCartCheckout() {
   const [selectedTimeSlot, setSelectedTimeSlot] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
   const [orderNotes, setOrderNotes] = useState('');
-  const [loyaltyPoints, setLoyaltyPoints] = useState(1250);
+  const [loyaltyPoints, setLoyaltyPoints] = useState(0);
   const [usePoints, setUsePoints] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [expandedItems, setExpandedItems] = useState({});
-
-  // Mock data
-  const mockCartItems = [
-    {
-      id: 1,
-      name: "Margherita Pizza",
-      image: "https://images.unsplash.com/photo-1604382354936-07c5d9983bd3?w=300&h=200&fit=crop",
-      price: 18.99,
-      quantity: 2,
-      customizations: ["Large Size", "Extra Cheese", "Thin Crust"],
-      allergens: ["Gluten", "Dairy"],
-      prepTime: 15
-    },
-    {
-      id: 2,
-      name: "Caesar Salad",
-      image: "https://images.pexels.com/photos/1059905/pexels-photo-1059905.jpeg?w=300&h=200&fit=crop",
-      price: 12.50,
-      quantity: 1,
-      customizations: ["No Croutons", "Extra Dressing"],
-      allergens: ["Dairy", "Eggs"],
-      prepTime: 8
-    },
-    {
-      id: 3,
-      name: "Chocolate Brownie",
-      image: "https://images.pixabay.com/photo/2017/01/11/11/33/cake-1971552_1280.jpg?w=300&h=200&fit=crop",
-      price: 8.75,
-      quantity: 1,
-      customizations: ["With Ice Cream", "Extra Chocolate Sauce"],
-      allergens: ["Gluten", "Dairy", "Nuts"],
-      prepTime: 5
-    }
-  ];
+  const { cart, updateItem, removeItem, totals, clearCart } = useCart();
+  const { user, isAuthenticated } = useAuth();
+  const cartItems = cart?.items || [];
 
   const savedAddresses = [
     {
@@ -83,27 +53,24 @@ function ShoppingCartCheckout() {
   ];
 
   useEffect(() => {
-    setCartItems(mockCartItems);
-    setSelectedAddress(savedAddresses[0].id);
-    setSelectedTimeSlot(timeSlots[0].id);
-    setPaymentMethod(paymentMethods[0].id);
+    setSelectedAddress(savedAddresses[0]?.id || '');
+    const firstAvailableSlot = timeSlots.find(slot => slot.available);
+    setSelectedTimeSlot(firstAvailableSlot?.id || '');
+    setPaymentMethod(paymentMethods[0]?.id || '');
   }, []);
 
-  const updateQuantity = (itemId, newQuantity) => {
-    if (newQuantity === 0) {
-      setCartItems(cartItems.filter(item => item.id !== itemId));
-    } else {
-      setCartItems(cartItems.map(item => 
-        item.id === itemId ? { ...item, quantity: newQuantity } : item
-      ));
+  useEffect(() => {
+    if (user) {
+      setLoyaltyPoints(user.loyaltyPoints || 0);
     }
-  };
+  }, [user]);
 
-  const toggleItemExpansion = (itemId) => {
-    setExpandedItems(prev => ({
-      ...prev,
-      [itemId]: !prev[itemId]
-    }));
+  const updateQuantity = (itemId, newQuantity) => {
+    if (newQuantity <= 0) {
+      removeItem(itemId);
+      return;
+    }
+    updateItem(itemId, newQuantity);
   };
 
   const applyPromoCode = () => {
@@ -116,9 +83,7 @@ function ShoppingCartCheckout() {
     }
   };
 
-  const calculateSubtotal = () => {
-    return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
-  };
+  const calculateSubtotal = () => totals.subtotal || 0;
 
   const calculateDiscount = () => {
     if (promoMessage.includes('10%')) return calculateSubtotal() * 0.1;
@@ -143,29 +108,38 @@ function ShoppingCartCheckout() {
   };
 
   const getEstimatedPrepTime = () => {
-    const maxPrepTime = Math.max(...cartItems.map(item => item.prepTime));
+    if (!cartItems.length) return 0;
+    const maxPrepTime = Math.max(...cartItems.map(cartItem => cartItem.item.prepTime || 15));
     const kitchenLoad = 1.2; // Mock ML prediction factor
     return Math.ceil(maxPrepTime * kitchenLoad);
   };
 
   const handlePlaceOrder = async () => {
-    if (cartItems.length === 0) return;
+    if (!isAuthenticated) {
+      navigate('/customer-login-register', { state: { from: '/shopping-cart-checkout' } });
+      return;
+    }
+    if (cartItems.length === 0 || !cart?.id) return;
     
     setIsLoading(true);
     
     try {
-      // Simulate order placement
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const { data } = await api.post('/orders', {
+        cartId: cart.id,
+        deliveryEta: null,
+        notes: orderNotes,
+      });
       
-      // Navigate to order tracking
+      await clearCart();
       navigate('/order-tracking-status', { 
         state: { 
-          orderId: 'ORD-' + Date.now(),
-          total: calculateTotal().toFixed(2)
+          orderId: data.order.id,
+          total: Number(data.order.total).toFixed(2)
         }
       });
     } catch (error) {
       console.error('Order placement failed:', error);
+      setPromoMessage(error.response?.data?.message || 'Order placement failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -238,13 +212,15 @@ function ShoppingCartCheckout() {
 
                 {/* Cart Items List */}
                 <div className="space-y-4">
-                  {cartItems.map((item) => (
-                    <div key={item.id} className="bg-surface border border-border rounded-lg p-6 shadow-soft">
+                  {cartItems.map((cartItem) => {
+                    const item = cartItem.item;
+                    return (
+                    <div key={cartItem.id} className="bg-surface border border-border rounded-lg p-6 shadow-soft">
                       <div className="flex items-start space-x-4">
                         {/* Item Image */}
                         <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0">
                           <Image
-                            src={item.image}
+                            src={item.imageUrl}
                             alt={item.name}
                             className="w-full h-full object-cover"
                           />
@@ -258,23 +234,23 @@ function ShoppingCartCheckout() {
                                 {item.name}
                               </h3>
                               <p className="text-primary font-body font-body-medium">
-                                ${item.price.toFixed(2)} each
+                                ${Number(item.price).toFixed(2)} each
                               </p>
                             </div>
                             
                             {/* Quantity Controls */}
                             <div className="flex items-center space-x-3">
                               <button
-                                onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                onClick={() => updateQuantity(cartItem.id, cartItem.quantity - 1)}
                                 className="w-8 h-8 flex items-center justify-center border border-border rounded-lg hover:bg-secondary-50 transition-smooth"
                               >
                                 <Icon name="Minus" size={16} />
                               </button>
                               <span className="font-data font-data-normal text-lg w-8 text-center">
-                                {item.quantity}
+                                {cartItem.quantity}
                               </span>
                               <button
-                                onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                onClick={() => updateQuantity(cartItem.id, cartItem.quantity + 1)}
                                 className="w-8 h-8 flex items-center justify-center border border-border rounded-lg hover:bg-secondary-50 transition-smooth"
                               >
                                 <Icon name="Plus" size={16} />
@@ -282,43 +258,23 @@ function ShoppingCartCheckout() {
                             </div>
                           </div>
 
-                          {/* Customizations Toggle */}
-                          {item.customizations.length > 0 && (
-                            <button
-                              onClick={() => toggleItemExpansion(item.id)}
-                              className="flex items-center space-x-2 mt-2 text-sm text-text-secondary hover:text-primary transition-smooth"
-                            >
-                              <Icon 
-                                name={expandedItems[item.id] ? "ChevronUp" : "ChevronDown"} 
-                                size={16} 
-                              />
-                              <span>Customizations ({item.customizations.length})</span>
-                            </button>
+                          {/* Special Notes */}
+                          {cartItem.notes && (
+                            <div className="mt-3">
+                              <div className="flex items-center space-x-2 text-sm text-text-secondary font-body">
+                                <Icon name="StickyNote" size={16} />
+                                <span>{cartItem.notes}</span>
+                              </div>
+                            </div>
                           )}
 
-                          {/* Expanded Customizations */}
-                          {expandedItems[item.id] && (
-                            <div className="mt-3 space-y-2">
-                              <div className="flex flex-wrap gap-2">
-                                {item.customizations.map((customization, index) => (
-                                  <span
-                                    key={index}
-                                    className="px-2 py-1 bg-primary-50 text-primary text-sm rounded-md font-body"
-                                  >
-                                    {customization}
-                                  </span>
-                                ))}
-                              </div>
-                              
-                              {/* Allergens */}
-                              {item.allergens.length > 0 && (
-                                <div className="flex items-center space-x-2">
-                                  <Icon name="AlertTriangle" size={16} className="text-warning-600" />
-                                  <span className="text-sm text-text-secondary font-body">
-                                    Contains: {item.allergens.join(', ')}
-                                  </span>
-                                </div>
-                              )}
+                          {/* Allergens */}
+                          {item.allergens?.length > 0 && (
+                            <div className="mt-3 flex items-center space-x-2">
+                              <Icon name="AlertTriangle" size={16} className="text-warning-600" />
+                              <span className="text-sm text-text-secondary font-body">
+                                Contains: {item.allergens.join(', ')}
+                              </span>
                             </div>
                           )}
 
@@ -333,10 +289,10 @@ function ShoppingCartCheckout() {
                             </Link>
                             <div className="flex items-center space-x-4">
                               <span className="text-lg font-heading font-heading-medium text-text-primary">
-                                ${(item.price * item.quantity).toFixed(2)}
+                                ${(Number(item.price) * cartItem.quantity).toFixed(2)}
                               </span>
                               <button
-                                onClick={() => updateQuantity(item.id, 0)}
+                                onClick={() => updateQuantity(cartItem.id, 0)}
                                 className="p-1 text-error hover:bg-error-50 rounded transition-smooth"
                               >
                                 <Icon name="Trash2" size={16} />
@@ -346,7 +302,7 @@ function ShoppingCartCheckout() {
                         </div>
                       </div>
                     </div>
-                  ))}
+                  )})}
                 </div>
 
                 {/* Promo Code */}

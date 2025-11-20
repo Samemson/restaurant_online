@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import Icon from 'components/AppIcon';
 import Image from 'components/AppImage';
+import { useAuth } from 'context/AuthContext';
 
 function CustomerLoginRegister() {
   const [activeTab, setActiveTab] = useState('login');
@@ -22,13 +23,7 @@ function CustomerLoginRegister() {
   const [passwordStrength, setPasswordStrength] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
-
-  // Mock credentials for testing
-  const mockCredentials = {
-    customer: { email: "customer@tastebite.com", password: "customer123" },
-    admin: { email: "admin@tastebite.com", password: "admin123" },
-    staff: { email: "staff@tastebite.com", password: "staff123" }
-  };
+  const { login: loginUser, register: registerUser } = useAuth();
 
   useEffect(() => {
     // Reset form when switching tabs
@@ -138,29 +133,22 @@ function CustomerLoginRegister() {
     setIsLoading(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
       if (activeTab === 'login') {
-        // Check mock credentials
-        const isValidCredentials = Object.values(mockCredentials).some(
-          cred => cred.email === formData.email && cred.password === formData.password
-        );
-
-        if (!isValidCredentials) {
-          setErrors({ 
-            submit: `Invalid credentials. Try: ${mockCredentials.customer.email} / ${mockCredentials.customer.password}` 
-          });
-          setIsLoading(false);
-          return;
-        }
+        await loginUser({ email: formData.email, password: formData.password });
+      } else {
+        await registerUser({
+          email: formData.email,
+          password: formData.password,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          phone: formData.phone,
+        });
       }
 
-      // Success - redirect to intended page or menu
       const redirectTo = location.state?.from || '/menu-browse-search';
       navigate(redirectTo);
     } catch (error) {
-      setErrors({ submit: 'Authentication failed. Please try again.' });
+      setErrors({ submit: error.response?.data?.message || 'Authentication failed. Please try again.' });
     } finally {
       setIsLoading(false);
     }
@@ -555,13 +543,13 @@ function CustomerLoginRegister() {
 
             {/* Mock Credentials Info */}
             <div className="mt-8 p-4 bg-accent-50 border border-accent-100 rounded-lg">
-              <h4 className="text-sm font-body font-body-medium text-text-primary mb-2">
+              <h4 className="text-sm	font-body font-body-medium text-text-primary mb-2">
                 Demo Credentials:
               </h4>
               <div className="text-xs font-data space-y-1 text-text-secondary">
-                <div>Customer: {mockCredentials.customer.email} / {mockCredentials.customer.password}</div>
-                <div>Admin: {mockCredentials.admin.email} / {mockCredentials.admin.password}</div>
-                <div>Staff: {mockCredentials.staff.email} / {mockCredentials.staff.password}</div>
+                <div>Customer: customer@tastebite.com / customer123</div>
+                <div>Admin: admin@tastebite.com / admin123</div>
+                <div>Staff: staff@tastebite.com / staff123</div>
               </div>
             </div>
           </div>

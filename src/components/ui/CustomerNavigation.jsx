@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import Icon from '../AppIcon';
+import { useAuth } from 'context/AuthContext';
+import { useCart } from 'context/CartContext';
 
 function CustomerNavigation() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [cartItemCount] = useState(3); // This would come from cart context in real app
-  const [isLoggedIn] = useState(false); // This would come from auth context in real app
   const location = useLocation();
+  const { isAuthenticated, user } = useAuth();
+  const { cart } = useCart();
+  const cartItemCount = cart?.items?.reduce((sum, cartItem) => sum + cartItem.quantity, 0) || 0;
 
   const navigationItems = [
     { label: 'Menu', path: '/menu-browse-search', icon: 'ChefHat' },
@@ -71,13 +74,13 @@ function CustomerNavigation() {
             </Link>
 
             {/* Auth Button */}
-            {isLoggedIn ? (
+            {isAuthenticated ? (
               <Link
                 to="/customer-account-order-history"
                 className="hidden md:flex items-center space-x-2 px-4 py-2 text-text-secondary hover:text-primary transition-smooth"
               >
                 <Icon name="User" size={18} />
-                <span className="font-body font-body-medium">Profile</span>
+                <span className="font-body font-body-medium">{user?.firstName || 'Profile'}</span>
               </Link>
             ) : (
               <Link
@@ -120,14 +123,14 @@ function CustomerNavigation() {
             ))}
             
             <div className="border-t border-border pt-4 mt-4">
-              {isLoggedIn ? (
+              {isAuthenticated ? (
                 <Link
                   to="/customer-account-order-history"
                   onClick={closeMobileMenu}
                   className="flex items-center space-x-3 px-4 py-3 rounded-lg text-text-secondary hover:text-primary hover:bg-primary-50 transition-smooth font-body font-body-medium min-h-touch"
                 >
                   <Icon name="User" size={20} />
-                  <span>Profile</span>
+                  <span>{user?.firstName || 'Profile'}</span>
                 </Link>
               ) : (
                 <Link

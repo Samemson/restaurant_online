@@ -6,7 +6,8 @@ function RecentActivity({ activities }) {
   // Function to format the timestamp to a relative time string
   const getRelativeTime = (timestamp) => {
     const now = new Date();
-    const diffInMinutes = Math.floor((now - timestamp) / (1000 * 60));
+    const eventDate = new Date(timestamp);
+    const diffInMinutes = Math.floor((now - eventDate) / (1000 * 60));
     
     if (diffInMinutes < 1) return 'Just now';
     if (diffInMinutes < 60) return `${diffInMinutes}m ago`;

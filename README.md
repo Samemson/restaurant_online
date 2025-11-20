@@ -24,16 +24,41 @@ A modern React-based project utilizing the latest frontend technologies and tool
 1. Install dependencies:
    ```bash
    npm install
-   # or
-   yarn install
    ```
-   
-2. Start the development server:
+
+2. Start Postgres + PgAdmin (first time only):
    ```bash
-   npm start
-   # or
-   yarn start
+   docker-compose up -d
    ```
+
+3. Generate the Prisma client, run migrations, and seed the database:
+   ```bash
+   npm run prisma:generate
+   npm run prisma:migrate
+   npm run prisma:seed
+   ```
+
+4. Launch the full stack (Vite frontend + Netlify Functions + Socket server):
+   ```bash
+   npm run dev:full
+   ```
+
+   The Vite app runs on `http://localhost:8888`, API routes are proxied to `/.netlify/functions/api`, and Socket.IO is available at `/socket.io`.
+
+## 🗄️ Backend & Data
+
+- **Serverless API**: Node/Express application located under `server/` and deployed through Netlify Functions (`netlify/functions/api.js`).
+- **Realtime**: Socket.IO server bootstrapped from `netlify/functions/socket.js`, publishing kitchen + order events.
+- **Database**: PostgreSQL (Docker) managed via Prisma ORM. PgAdmin is exposed on `http://localhost:5050` (default credentials in `docker-compose.yml`).
+- **Prisma schema**: `prisma/schema.prisma` defines users, menu items, carts, orders, analytics events, etc. Use `npm run prisma:seed` to load demo content and credentials.
+
+Environment variables (create `.env` at repo root):
+```
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/tastebite"
+JWT_SECRET="replace-me"
+CLIENT_ORIGIN="http://localhost:8888"
+SOCKET_PORT=5001
+```
 
 ## 📁 Project Structure
 
@@ -53,6 +78,19 @@ react_app/
 ├── tailwind.config.js  # Tailwind CSS configuration
 └── vite.config.js      # Vite configuration
 ```
+
+## 🔌 Key Commands
+
+| Command | Description |
+| --- | --- |
+| `npm run dev:full` | Starts Vite + Netlify Functions + Socket server (Netlify CLI) |
+| `npm run prisma:migrate` | Runs pending Prisma migrations against the configured Postgres instance |
+| `npm run prisma:seed` | Seeds menu, users, analytics data |
+| `npm run build` | Creates a production build with sourcemaps |
+
+## 🧪 Testing
+
+Jest/RTL scaffolding is present; add suites under `src/__tests__` or component directories. Backend logic can be tested with Vitest/jest by importing express handlers directly (`server/app.js`). (Coming soon: end-to-end flows that hit serverless functions.)
 
 ## 🧩 Adding Routes
 

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import Icon from 'components/AppIcon';
 import AdminNavigation from 'components/ui/AdminNavigation';
@@ -8,110 +9,20 @@ import TopSellingItems from './components/TopSellingItems';
 import OrderStatusChart from './components/OrderStatusChart';
 import LocationPerformance from './components/LocationPerformance';
 import CustomerSatisfaction from './components/CustomerSatisfaction';
+import api from 'api/http';
 
 function RestaurantAdminDashboard() {
   const [dateRange, setDateRange] = useState('week');
-  const [isLoading, setIsLoading] = useState(true);
-  const [dashboardData, setDashboardData] = useState(null);
-
-  useEffect(() => {
-    // Simulate data loading
-    const loadData = async () => {
-      setIsLoading(true);
-      try {
-        // Simulate API call delay
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        setDashboardData(mockDashboardData);
-      } catch (error) {
-        console.error("Error loading dashboard data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadData();
-  }, [dateRange]);
+  const { data: dashboardData, isLoading } = useQuery({
+    queryKey: ['admin-dashboard', dateRange],
+    queryFn: async () => {
+      const { data } = await api.get('/analytics/dashboard', { params: { range: dateRange } });
+      return data;
+    }
+  });
 
   const handleDateRangeChange = (range) => {
     setDateRange(range);
-  };
-
-  // Mock dashboard data
-  const mockDashboardData = {
-    summary: {
-      totalSales: 28456.75,
-      totalOrders: 427,
-      averageOrderValue: 66.64,
-      customerSatisfaction: 4.7
-    },
-    salesTrend: [
-    { date: '2023-05-01', sales: 3200 },
-    { date: '2023-05-02', sales: 3800 },
-    { date: '2023-05-03', sales: 4200 },
-    { date: '2023-05-04', sales: 3900 },
-    { date: '2023-05-05', sales: 4800 },
-    { date: '2023-05-06', sales: 5200 },
-    { date: '2023-05-07', sales: 4600 }],
-
-    topSellingItems: [
-    { id: 1, name: 'Margherita Pizza', category: 'Pizza', sales: 89, revenue: 1424, growth: 12 },
-    { id: 2, name: 'Chicken Alfredo Pasta', category: 'Pasta', sales: 76, revenue: 1216, growth: 8 },
-    { id: 3, name: 'Classic Cheeseburger', category: 'Burgers', sales: 72, revenue: 864, growth: -3 },
-    { id: 4, name: 'Caesar Salad', category: 'Salads', sales: 65, revenue: 780, growth: 15 },
-    { id: 5, name: 'Chocolate Lava Cake', category: 'Desserts', sales: 58, revenue: 522, growth: 20 }],
-
-    orderStatusDistribution: [
-    { status: 'Completed', value: 380 },
-    { status: 'In Progress', value: 27 },
-    { status: 'Cancelled', value: 20 }],
-
-    locationPerformance: [
-    { id: 1, name: 'Downtown', orders: 187, sales: 12450, satisfaction: 4.8 },
-    { id: 2, name: 'Westside', orders: 142, sales: 9320, satisfaction: 4.6 },
-    { id: 3, name: 'Northgate', orders: 98, sales: 6686.75, satisfaction: 4.7 }],
-
-    recentActivity: [
-    {
-      id: 1,
-      type: 'order',
-      title: 'New Order #ORD-7829',
-      description: 'New order received from John D. for $78.50',
-      timestamp: new Date(Date.now() - 5 * 60000),
-      status: 'new'
-    },
-    {
-      id: 2,
-      type: 'inventory',
-      title: 'Low Stock Alert',
-      description: 'Chicken wings inventory below threshold (5 units remaining)',
-      timestamp: new Date(Date.now() - 25 * 60000),
-      status: 'warning'
-    },
-    {
-      id: 3,
-      type: 'review',
-      title: 'New 5-Star Review',
-      description: 'Sarah M. left a 5-star review for their recent order',
-      timestamp: new Date(Date.now() - 120 * 60000),
-      status: 'positive'
-    },
-    {
-      id: 4,
-      type: 'order',
-      title: 'Order #ORD-7820 Completed',
-      description: 'Order successfully delivered to customer',
-      timestamp: new Date(Date.now() - 180 * 60000),
-      status: 'success'
-    },
-    {
-      id: 5,
-      type: 'system',
-      title: 'System Update',
-      description: 'Menu pricing updated for 12 items',
-      timestamp: new Date(Date.now() - 240 * 60000),
-      status: 'info'
-    }]
-
   };
 
   return (
@@ -157,7 +68,14 @@ function RestaurantAdminDashboard() {
                 <p className="text-text-secondary font-body">Loading dashboard data...</p>
               </div>
             </div> :
-
+          !dashboardData ? (
+            <div className="flex items-center justify-center h-96">
+              <div className="text-center">
+                <Icon name="AlertTriangle" size={48} className="text-warning mb-4" />
+                <p className="text-text-secondary font-body">Unable to load analytics data.</p>
+              </div>
+            </div>
+          ) : (
           <>
               {/* Summary Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

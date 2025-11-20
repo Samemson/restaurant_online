@@ -1,168 +1,59 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import CustomerNavigation from 'components/ui/CustomerNavigation';
 import Icon from 'components/AppIcon';
 import Image from 'components/AppImage';
+import api from 'api/http';
+import { useCart } from 'context/CartContext';
 
 function MenuBrowseSearch() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [cartItems, setCartItems] = useState([]);
   const [filters, setFilters] = useState({
     dietary: [],
     priceRange: [0, 50],
     prepTime: 60,
     allergens: []
   });
-  const [isLoading, setIsLoading] = useState(false);
   const [currentLocation] = useState('Downtown Branch');
+  const { addItem } = useCart();
 
-  // Mock data for categories
-  const categories = [
-    { id: 'all', name: 'All Items', icon: 'Grid3X3' },
-    { id: 'appetizers', name: 'Appetizers', icon: 'Utensils' },
-    { id: 'mains', name: 'Main Course', icon: 'ChefHat' },
-    { id: 'desserts', name: 'Desserts', icon: 'Cake' },
-    { id: 'beverages', name: 'Beverages', icon: 'Coffee' },
-    { id: 'salads', name: 'Salads', icon: 'Leaf' },
-    { id: 'soups', name: 'Soups', icon: 'Bowl' }
-  ];
-
-  // Mock data for menu items
-  const menuItems = [
-    {
-      id: 1,
-      name: "Margherita Pizza",
-      description: "Fresh mozzarella, tomato sauce, basil leaves on crispy thin crust",
-      price: 18.99,
-      originalPrice: 22.99,
-      image: "https://images.unsplash.com/photo-1604382354936-07c5d9983bd3?w=400&h=300&fit=crop",
-      category: "mains",
-      dietary: ["vegetarian"],
-      spiceLevel: 0,
-      prepTime: 15,
-      allergens: ["gluten", "dairy"],
-      isAvailable: true,
-      isPopular: true,
-      discount: "Happy Hour 20% Off",
-      rating: 4.8,
-      reviewCount: 124
-    },
-    {
-      id: 2,
-      name: "Chicken Caesar Salad",
-      description: "Grilled chicken breast, romaine lettuce, parmesan, croutons with caesar dressing",
-      price: 14.99,
-      image: "https://images.unsplash.com/photo-1546793665-c74683f339c1?w=400&h=300&fit=crop",
-      category: "salads",
-      dietary: ["protein-rich"],
-      spiceLevel: 0,
-      prepTime: 10,
-      allergens: ["dairy", "eggs"],
-      isAvailable: true,
-      isPopular: false,
-      rating: 4.6,
-      reviewCount: 89
-    },
-    {
-      id: 3,
-      name: "Spicy Thai Curry",
-      description: "Authentic red curry with coconut milk, vegetables, and jasmine rice",
-      price: 16.99,
-      image: "https://images.unsplash.com/photo-1455619452474-d2be8b1e70cd?w=400&h=300&fit=crop",
-      category: "mains",
-      dietary: ["vegan", "gluten-free"],
-      spiceLevel: 3,
-      prepTime: 20,
-      allergens: [],
-      isAvailable: true,
-      isPopular: true,
-      rating: 4.7,
-      reviewCount: 156
-    },
-    {
-      id: 4,
-      name: "Chocolate Lava Cake",
-      description: "Warm chocolate cake with molten center, served with vanilla ice cream",
-      price: 8.99,
-      image: "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=400&h=300&fit=crop",
-      category: "desserts",
-      dietary: ["vegetarian"],
-      spiceLevel: 0,
-      prepTime: 12,
-      allergens: ["gluten", "dairy", "eggs"],
-      isAvailable: false,
-      isPopular: true,
-      rating: 4.9,
-      reviewCount: 203
-    },
-    {
-      id: 5,
-      name: "Fresh Mango Smoothie",
-      description: "Blend of fresh mangoes, yogurt, and honey with mint garnish",
-      price: 6.99,
-      image: "https://images.unsplash.com/photo-1553530666-ba11a7da3888?w=400&h=300&fit=crop",
-      category: "beverages",
-      dietary: ["vegetarian", "gluten-free"],
-      spiceLevel: 0,
-      prepTime: 5,
-      allergens: ["dairy"],
-      isAvailable: true,
-      isPopular: false,
-      rating: 4.4,
-      reviewCount: 67
-    },
-    {
-      id: 6,
-      name: "BBQ Bacon Burger",
-      description: "Beef patty with crispy bacon, BBQ sauce, lettuce, tomato on brioche bun",
-      price: 19.99,
-      image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=300&fit=crop",
-      category: "mains",
-      dietary: ["protein-rich"],
-      spiceLevel: 1,
-      prepTime: 18,
-      allergens: ["gluten", "dairy"],
-      isAvailable: true,
-      isPopular: true,
-      rating: 4.5,
-      reviewCount: 178
-    },
-    {
-      id: 7,
-      name: "Tomato Basil Soup",
-      description: "Creamy tomato soup with fresh basil, served with garlic bread",
-      price: 9.99,
-      image: "https://images.unsplash.com/photo-1547592166-23ac45744acd?w=400&h=300&fit=crop",
-      category: "soups",
-      dietary: ["vegetarian"],
-      spiceLevel: 0,
-      prepTime: 8,
-      allergens: ["gluten", "dairy"],
-      isAvailable: true,
-      isPopular: false,
-      rating: 4.3,
-      reviewCount: 45
-    },
-    {
-      id: 8,
-      name: "Buffalo Wings",
-      description: "Crispy chicken wings tossed in spicy buffalo sauce with blue cheese dip",
-      price: 12.99,
-      image: "https://images.unsplash.com/photo-1527477396000-e27163b481c2?w=400&h=300&fit=crop",
-      category: "appetizers",
-      dietary: ["protein-rich"],
-      spiceLevel: 2,
-      prepTime: 15,
-      allergens: ["dairy"],
-      isAvailable: true,
-      isPopular: true,
-      rating: 4.6,
-      reviewCount: 134
+  const { data: categoriesResponse } = useQuery({
+    queryKey: ['menu-categories'],
+    queryFn: async () => {
+      const { data } = await api.get('/menu/categories');
+      return data.categories;
     }
-  ];
+  });
+
+  const {
+    data: menuResponse,
+    isLoading,
+  } = useQuery({
+    queryKey: ['menu-items'],
+    queryFn: async () => {
+      const { data } = await api.get('/menu/items');
+      return data.items;
+    }
+  });
+
+  const categories = useMemo(() => {
+    const base = [{ id: 'all', name: 'All Items', icon: 'Grid3X3' }];
+    if (!categoriesResponse) return base;
+    return [
+      ...base,
+      ...categoriesResponse.map(category => ({
+        id: category.slug,
+        name: category.name,
+        icon: category.icon || 'Circle'
+      }))
+    ];
+  }, [categoriesResponse]);
+
+  const menuItems = useMemo(() => menuResponse || [], [menuResponse]);
 
   // Filter and search logic
   const filteredItems = useMemo(() => {
@@ -170,7 +61,7 @@ function MenuBrowseSearch() {
 
     // Category filter
     if (selectedCategory !== 'all') {
-      filtered = filtered.filter(item => item.category === selectedCategory);
+      filtered = filtered.filter(item => item.category.slug === selectedCategory);
     }
 
     // Search filter
@@ -190,7 +81,7 @@ function MenuBrowseSearch() {
 
     // Price range filter
     filtered = filtered.filter(item =>
-      item.price >= filters.priceRange[0] && item.price <= filters.priceRange[1]
+      Number(item.price) >= filters.priceRange[0] && Number(item.price) <= filters.priceRange[1]
     );
 
     // Prep time filter
@@ -208,18 +99,7 @@ function MenuBrowseSearch() {
 
   const handleAddToCart = (item) => {
     if (!item.isAvailable) return;
-    
-    setCartItems(prev => {
-      const existingItem = prev.find(cartItem => cartItem.id === item.id);
-      if (existingItem) {
-        return prev.map(cartItem =>
-          cartItem.id === item.id
-            ? { ...cartItem, quantity: cartItem.quantity + 1 }
-            : cartItem
-        );
-      }
-      return [...prev, { ...item, quantity: 1 }];
-    });
+    addItem(item.id);
   };
 
   const handleItemClick = (item) => {
@@ -529,7 +409,7 @@ function MenuBrowseSearch() {
                       {/* Image Container */}
                       <div className="relative h-48 overflow-hidden">
                         <Image
-                          src={item.image}
+                          src={item.imageUrl}
                           alt={item.name}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
@@ -629,7 +509,7 @@ function MenuBrowseSearch() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-2">
                             <span className="text-lg font-heading font-heading-medium text-text-primary">
-                              ${item.price}
+                              ${Number(item.price).toFixed(2)}
                             </span>
                             {item.originalPrice && (
                               <span className="text-sm text-text-secondary line-through font-body">
